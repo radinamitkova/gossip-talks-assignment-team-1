@@ -1,0 +1,73 @@
+package bg.codeacademy.spring.gossiptalks.dtos;
+
+import bg.codeacademy.spring.gossiptalks.model.User;
+import bg.codeacademy.spring.gossiptalks.security.AppUser;
+
+public class UserResponse
+{
+  private String  email;
+  private String  username;
+  private String  name;
+  private Boolean following;
+
+  public String getEmail()
+  {
+    return email;
+  }
+
+  public UserResponse setEmail(String email)
+  {
+    this.email = email;
+    return this;
+  }
+
+  public String getUsername()
+  {
+    return username;
+  }
+
+  public UserResponse setUsername(String username)
+  {
+    this.username = username;
+    return this;
+  }
+
+  public String getName()
+  {
+    return name;
+  }
+
+  public UserResponse setName(String name)
+  {
+    this.name = name;
+    return this;
+  }
+
+  public Boolean isFollowing()
+  {
+    return following;
+  }
+
+  public UserResponse setFollowing(Boolean following)
+  {
+    this.following = following;
+    return this;
+  }
+
+  public static UserResponse mapUserToDTO(AppUser loggedUser, User user)
+  {
+    UserResponse response = new UserResponse()
+        .setUsername(user.getUsername())
+        .setEmail(user.getEmail())
+        .setName(user.getName());
+    if (loggedUser != null) {
+      response.setFollowing(loggedUser.getUser().getFriends().stream()
+          .anyMatch(e -> e.getId().equals(user.getId()))
+          || loggedUser.getUser().getUsername().equals(user.getUsername()));
+    }
+    else{
+      response.setFollowing(false);
+    }
+    return response;
+  }
+}

@@ -1,0 +1,54 @@
+package bg.codeacademy.spring.gossiptalks.model;
+
+import javax.persistence.*;
+import java.util.Date;
+
+@Entity
+public class Gossip {
+
+  @Id
+  @GeneratedValue
+  private Long id;
+  private String text;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  private User user;
+
+  private Date date;
+
+  public Long getId() {
+    return id;
+  }
+
+  public Gossip setId(Long id) {
+    this.id = id;
+    return this;
+  }
+
+  public String getText() {
+    return text;
+  }
+
+  public Gossip setText(String text) {
+    this.text = text;
+    return this;
+  }
+
+  public User getUser() {
+    return user;
+  }
+
+  public Gossip setUser(User user) {
+    this.user = user;
+    return this;
+  }
+
+  public Date getDate() {
+    return date;
+  }
+
+  public Gossip setDate(Date date) {
+    this.date = date;
+    return this;
+  }
+}

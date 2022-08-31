@@ -1,0 +1,149 @@
+package bg.codeacademy.spring.gossiptalks.controllers;
+
+import bg.codeacademy.spring.gossiptalks.dtos.ChangePasswordRequest;
+import bg.codeacademy.spring.gossiptalks.dtos.CreateUserRequest;
+import bg.codeacademy.spring.gossiptalks.dtos.GossipList;
+import bg.codeacademy.spring.gossiptalks.dtos.UserResponse;
+import bg.codeacademy.spring.gossiptalks.model.Gossip;
+import bg.codeacademy.spring.gossiptalks.model.User;
+import bg.codeacademy.spring.gossiptalks.security.AppUser;
+import bg.codeacademy.spring.gossiptalks.security.LoggedInUser;
+import bg.codeacademy.spring.gossiptalks.services.GossipService;
+import bg.codeacademy.spring.gossiptalks.services.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.web.bind.annotation.*;
+
+import javax.validation.Valid;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import static bg.codeacademy.spring.gossiptalks.dtos.GossipList.createGossipListFromPage;
+
+
+@RestController
+@RequestMapping("/api/v1/users")
+public class UserController
+{
+  @Autowired
+  private UserService userService;
+
+
+  @Autowired
+  private GossipService gossipService;
+
+
+  @PostMapping("/me")
+  public ResponseEntity<?> changePassword(@LoggedInUser AppUser appUser,@Valid ChangePasswordRequest request) throws Exception
+  {
+    BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
+    User user = appUser.getUser();
+    if (!request.getPassword().equals(request.getPasswordConfirmation())) {
+      throw new Exception("Passwords don't match!");
+    }
+    else if (request.getPassword().equals(request.getOldPassword())) {
+      throw new Exception("New password same as old one!");
+    }
+    else if (!encoder.matches(request.getOldPassword(), appUser.getPassword())) {
+      throw new Exception("Incorrect old password!");
+    }
+    else {
+      user.setPassword(request.getPassword());
+      userService.save(user);
+      return ResponseEntity.ok(UserResponse.mapUserToDTO(appUser, user).setFollowing(true));
+    }
+  }
+
+
+  @GetMapping
+  public ResponseEntity<List<UserResponse>> getAllByMostActive(@LoggedInUser AppUser loggedUser, @RequestParam(required = false, defaultValue = "") String name,
+                                                               @RequestParam( defaultValue = "false")  Boolean f)
+  {
+    List<User> mostActive = new ArrayList<>();
+    List<UserResponse> dtoList = new ArrayList<>();
+
+    if (f) {
+      mostActive.addAll(
+          loggedUser.getUser().getFriends());
+    }
+    else {
+      mostActive.addAll(userService.getAll());
+      Collections.reverse(mostActive);
+    }
+
+    for (User u : mostActive) {
+      UserResponse userResponse = UserResponse.mapUserToDTO(loggedUser, u);
+      if (userResponse.getName().toLowerCase().contains(name.toLowerCase())
+          || userResponse.getUsername().toLowerCase().contains(name.toLowerCase())) {
+        dtoList.add(userResponse);
+      }
+    }
+
+    return new ResponseEntity<>(dtoList, HttpStatus.OK);
+  }
+
+  @GetMapping("/{username}/gossips")
+  public ResponseEntity<GossipList> getUserFeed(@RequestParam(defaultValue = "0") Integer pageNo,
+                                                @RequestParam(defaultValue = "20") Integer pageSize,
+                                                @PathVariable("username") String username)
+  {
+    User user = userService.getByUsername(username);
+
+    Page<Gossip> page = gossipService.getByUser(PageRequest.of(pageNo, pageSize, Sort.by("date").descending()), user);
+
+    return ResponseEntity.ok(createGossipListFromPage(page));
+  }
+
+  @GetMapping("/me")
+  public ResponseEntity<UserResponse> getCurrentUser(@LoggedInUser AppUser appUser)
+  {
+    User loggedUser = appUser.getUser();
+    return ResponseEntity.ok(UserResponse.mapUserToDTO(appUser, loggedUser).setFollowing(true));
+  }
+
+
+  @PostMapping(value = "/{username}/follow", consumes = {MediaType.MULTIPART_FORM_DATA_VALUE})
+  public ResponseEntity<UserResponse> followUser(@LoggedInUser AppUser appUser, @PathVariable String username, Boolean follow)
+  {
+
+    User loggedUser = appUser.getUser();
+
+    User userToFollow = userService.getByUsername(username);
+
+    if (follow) {
+      loggedUser.addFriend(userToFollow);
+    }
+
+    else {
+      loggedUser.getFriends().remove(userToFollow);
+    }
+
+    userService.updateFriendList(loggedUser);
+
+    return ResponseEntity.ok(UserResponse.mapUserToDTO(appUser,userToFollow).setFollowing(follow));
+
+  }
+
+
+  @PostMapping(consumes = {MediaType.MULTIPART_FORM_DATA_VALUE})
+  public ResponseEntity<UserResponse> createUser(@Valid CreateUserRequest createUserRequest)
+      throws Exception
+  {
+
+    User savedUser = userService.create(createUserRequest.getEmail(), createUserRequest.getUsername(),
+        createUserRequest.getName(), createUserRequest.getPassword());
+
+    return new ResponseEntity<>(UserResponse.mapUserToDTO(null, savedUser), HttpStatus.OK);
+  }
+
+}
+

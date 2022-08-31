@@ -1,0 +1,15 @@
+package bg.codeacademy.spring.gossiptalks.repositories;
+
+import bg.codeacademy.spring.gossiptalks.model.User;
+import org.springframework.data.repository.PagingAndSortingRepository;
+
+import org.springframework.data.rest.core.annotation.RepositoryRestResource;
+import java.util.Set;
+
+@RepositoryRestResource
+public interface UserRepository extends PagingAndSortingRepository<User,Long>
+{
+    User findByUsername(String username);
+
+    Set<User> findUser( String username);
+}
